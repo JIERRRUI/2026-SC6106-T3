@@ -6,6 +6,7 @@
 <body>
     <div class = "container">
         <h2>Main</h2>
+        <p>Current user: {{ user_name if user_name else "Not set" }}</p>
         <form action = "/transferMoney" method = "post">
             <input type = "submit" value = "Transfer Money">
         </form>

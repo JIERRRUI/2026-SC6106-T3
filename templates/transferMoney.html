@@ -20,6 +20,7 @@
         <p id="view_payer"></p>
         <p id="view_payee"></p>
         <p id="view_amount"></p>
+        <p id="transfer_status"></p>
 
         <script src = "https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
         <script>
@@ -101,6 +102,17 @@
                 const amount = document.getElementById('amount').value;
                 console.log(payer,payee,amount);
                 await contract.methods.weixin(payer, payee,amount).send({from: accounts[0]});
+
+                const latestTransfer = {
+                    from: payer,
+                    to: payee,
+                    amount: amount,
+                    action: "transfer",
+                    txBy: accounts[0],
+                    storedAt: Date.now()
+                };
+                localStorage.setItem("latestTransferTx", JSON.stringify(latestTransfer));
+                document.getElementById('transfer_status').innerText = "Transfer saved for User Manager";
             }
 
             async function transaction(){

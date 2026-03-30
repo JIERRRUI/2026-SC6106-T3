@@ -7,24 +7,17 @@
     <div class="container" style="max-width: 640px;">
         <h2>User Manager</h2>
         <p>Use the deployed UserTransactionManager contract</p>
+        <p>Main page user name: <strong id="mainUserName"></strong></p>
 
         <input type="text" id="contractAddress" value="0xcfb9af0dc66edcd62d9003c575922921d101313c" placeholder="Contract Address">
-        <input type="text" id="userAddress" placeholder="User Address">
-        <input type="text" id="userName" placeholder="User Name">
-
-        <button class="btn" onclick="addUser()">Add User</button>
-        <button class="btn" onclick="storeUser()">Store/Update User</button>
+        <button class="btn" onclick="connectWalletAndSyncUser()">Connect Wallet & Sync User</button>
         <button class="btn" onclick="deleteUser()">Delete User</button>
         <button class="btn" onclick="getUser()">Get User</button>
         <button class="btn" onclick="getAllUsers()">Get All Users</button>
 
         <h2 style="font-size: 20px; margin-top: 24px;">Transaction</h2>
-        <input type="text" id="fromAddress" placeholder="From Address">
-        <input type="text" id="toAddress" placeholder="To Address">
-        <input type="number" id="amount" placeholder="Amount">
-        <input type="text" id="action" placeholder="Action (transfer/deposit)">
-
-        <button class="btn" onclick="recordTransaction()">Record Transaction</button>
+        <p>Transaction data is read from Transfer Money page.</p>
+        <button class="btn" onclick="recordTransactionFromTransfer()">Record Last Transfer</button>
         <button class="btn" onclick="viewTransactions()">View User Transactions</button>
 
         <form action="/main" method="post">
@@ -36,6 +29,7 @@
         <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
         <script>
             const defaultContractAddress = "0xcfb9af0dc66edcd62d9003c575922921d101313c";
+            const appUserName = {{ user_name|tojson }};
             const contractABI = [
                 {
                     "inputs": [
@@ -350,37 +344,40 @@
                 if (!contractAddress) {
                     throw new Error("Please input contract address");
                 }
+                if (!window.ethereum) {
+                    throw new Error("Wallet not found. Please install MetaMask.");
+                }
                 const web3 = new Web3(Web3.givenProvider);
                 return { web3, contract: new web3.eth.Contract(contractABI, contractAddress) };
             }
 
             document.getElementById("contractAddress").value = defaultContractAddress;
+            document.getElementById("mainUserName").innerText = appUserName || "Not set";
 
             function setResult(message) {
                 document.getElementById("result").innerText = message;
             }
 
-            async function addUser() {
-                try {
-                    const { web3, contract } = getContract();
-                    const accounts = await web3.eth.requestAccounts();
-                    const userAddress = document.getElementById("userAddress").value;
-                    const userName = document.getElementById("userName").value;
-                    await contract.methods.addUser(userAddress, userName).send({ from: accounts[0] });
-                    setResult("User added successfully");
-                } catch (err) {
-                    setResult(err.message);
+            let connectedAccount = null;
+
+            function ensureConnectedAccount() {
+                if (!connectedAccount) {
+                    throw new Error("Please connect wallet first");
                 }
             }
 
-            async function storeUser() {
+            async function connectWalletAndSyncUser() {
                 try {
                     const { web3, contract } = getContract();
                     const accounts = await web3.eth.requestAccounts();
-                    const userAddress = document.getElementById("userAddress").value;
-                    const userName = document.getElementById("userName").value;
-                    await contract.methods.storeUser(userAddress, userName).send({ from: accounts[0] });
-                    setResult("User stored/updated successfully");
+                    connectedAccount = accounts[0];
+
+                    if (!appUserName) {
+                        throw new Error("No user name found. Enter user name from main page first.");
+                    }
+
+                    await contract.methods.storeUser(connectedAccount, appUserName).send({ from: connectedAccount });
+                    setResult("Wallet connected and user profile stored/updated");
                 } catch (err) {
                     setResult(err.message);
                 }
@@ -388,10 +385,9 @@
 
             async function deleteUser() {
                 try {
-                    const { web3, contract } = getContract();
-                    const accounts = await web3.eth.requestAccounts();
-                    const userAddress = document.getElementById("userAddress").value;
-                    await contract.methods.deleteUser(userAddress).send({ from: accounts[0] });
+                    ensureConnectedAccount();
+                    const { contract } = getContract();
+                    await contract.methods.deleteUser(connectedAccount).send({ from: connectedAccount });
                     setResult("User deleted successfully");
                 } catch (err) {
                     setResult(err.message);
@@ -400,9 +396,9 @@
 
             async function getUser() {
                 try {
+                    ensureConnectedAccount();
                     const { contract } = getContract();
-                    const userAddress = document.getElementById("userAddress").value;
-                    const result = await contract.methods.getUser(userAddress).call();
+                    const result = await contract.methods.getUser(connectedAccount).call();
                     setResult(
                         "Name: " + result.name +
                         " | Exists: " + result.exists +
@@ -424,17 +420,30 @@
                 }
             }
 
-            async function recordTransaction() {
+            async function recordTransactionFromTransfer() {
                 try {
-                    const { web3, contract } = getContract();
-                    const accounts = await web3.eth.requestAccounts();
-                    const userAddress = document.getElementById("userAddress").value;
-                    const fromAddress = document.getElementById("fromAddress").value;
-                    const toAddress = document.getElementById("toAddress").value;
-                    const amount = document.getElementById("amount").value;
-                    const action = document.getElementById("action").value;
-                    await contract.methods.recordUserTransaction(userAddress, fromAddress, toAddress, amount, action).send({ from: accounts[0] });
-                    setResult("Transaction recorded successfully");
+                    ensureConnectedAccount();
+                    const { contract } = getContract();
+                    const transferDataRaw = localStorage.getItem("latestTransferTx");
+
+                    if (!transferDataRaw) {
+                        throw new Error("No transfer data found. Make a transfer on Transfer Money page first.");
+                    }
+
+                    const transferData = JSON.parse(transferDataRaw);
+                    if (!transferData.from || !transferData.to || !transferData.amount) {
+                        throw new Error("Transfer data is incomplete. Please perform transfer again.");
+                    }
+
+                    await contract.methods.recordUserTransaction(
+                        connectedAccount,
+                        transferData.from,
+                        transferData.to,
+                        transferData.amount,
+                        transferData.action || "transfer"
+                    ).send({ from: connectedAccount });
+
+                    setResult("Last transfer recorded successfully");
                 } catch (err) {
                     setResult(err.message);
                 }
@@ -442,9 +451,9 @@
 
             async function viewTransactions() {
                 try {
+                    ensureConnectedAccount();
                     const { contract } = getContract();
-                    const userAddress = document.getElementById("userAddress").value;
-                    const result = await contract.methods.viewUserTransactions(userAddress).call();
+                    const result = await contract.methods.viewUserTransactions(connectedAccount).call();
                     setResult("Transactions: " + JSON.stringify(result));
                 } catch (err) {
                     setResult(err.message);
