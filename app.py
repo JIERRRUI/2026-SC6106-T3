@@ -18,5 +18,9 @@ def transferMoney():
 def depositMoney():
     return(render_template("depositMoney.html"))
 
+@app.route("/userManager", methods = ["GET", "POST"])
+def userManager():
+    return(render_template("userManager.html"))
+
 if __name__ == "__main__":
     app.run()

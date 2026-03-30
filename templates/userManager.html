@@ -1,0 +1,455 @@
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}">
+</head>
+
+<body>
+    <div class="container" style="max-width: 640px;">
+        <h2>User Manager</h2>
+        <p>Use the deployed UserTransactionManager contract</p>
+
+        <input type="text" id="contractAddress" value="0xcfb9af0dc66edcd62d9003c575922921d101313c" placeholder="Contract Address">
+        <input type="text" id="userAddress" placeholder="User Address">
+        <input type="text" id="userName" placeholder="User Name">
+
+        <button class="btn" onclick="addUser()">Add User</button>
+        <button class="btn" onclick="storeUser()">Store/Update User</button>
+        <button class="btn" onclick="deleteUser()">Delete User</button>
+        <button class="btn" onclick="getUser()">Get User</button>
+        <button class="btn" onclick="getAllUsers()">Get All Users</button>
+
+        <h2 style="font-size: 20px; margin-top: 24px;">Transaction</h2>
+        <input type="text" id="fromAddress" placeholder="From Address">
+        <input type="text" id="toAddress" placeholder="To Address">
+        <input type="number" id="amount" placeholder="Amount">
+        <input type="text" id="action" placeholder="Action (transfer/deposit)">
+
+        <button class="btn" onclick="recordTransaction()">Record Transaction</button>
+        <button class="btn" onclick="viewTransactions()">View User Transactions</button>
+
+        <form action="/main" method="post">
+            <input type="submit" value="Main">
+        </form>
+
+        <p id="result"></p>
+
+        <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+        <script>
+            const defaultContractAddress = "0xcfb9af0dc66edcd62d9003c575922921d101313c";
+            const contractABI = [
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "string",
+                            "name": "name",
+                            "type": "string"
+                        }
+                    ],
+                    "name": "addUser",
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        }
+                    ],
+                    "name": "deleteUser",
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "from",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "address",
+                            "name": "to",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        },
+                        {
+                            "internalType": "string",
+                            "name": "action",
+                            "type": "string"
+                        }
+                    ],
+                    "name": "recordUserTransaction",
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        },
+                        {
+                            "internalType": "string",
+                            "name": "name",
+                            "type": "string"
+                        }
+                    ],
+                    "name": "storeUser",
+                    "outputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "function"
+                },
+                {
+                    "inputs": [],
+                    "stateMutability": "nonpayable",
+                    "type": "constructor"
+                },
+                {
+                    "anonymous": false,
+                    "inputs": [
+                        {
+                            "indexed": true,
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        },
+                        {
+                            "indexed": false,
+                            "internalType": "string",
+                            "name": "name",
+                            "type": "string"
+                        }
+                    ],
+                    "name": "UserAdded",
+                    "type": "event"
+                },
+                {
+                    "anonymous": false,
+                    "inputs": [
+                        {
+                            "indexed": true,
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        }
+                    ],
+                    "name": "UserDeleted",
+                    "type": "event"
+                },
+                {
+                    "anonymous": false,
+                    "inputs": [
+                        {
+                            "indexed": true,
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        },
+                        {
+                            "indexed": false,
+                            "internalType": "string",
+                            "name": "name",
+                            "type": "string"
+                        }
+                    ],
+                    "name": "UserStored",
+                    "type": "event"
+                },
+                {
+                    "anonymous": false,
+                    "inputs": [
+                        {
+                            "indexed": true,
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        },
+                        {
+                            "indexed": true,
+                            "internalType": "address",
+                            "name": "from",
+                            "type": "address"
+                        },
+                        {
+                            "indexed": true,
+                            "internalType": "address",
+                            "name": "to",
+                            "type": "address"
+                        },
+                        {
+                            "indexed": false,
+                            "internalType": "uint256",
+                            "name": "amount",
+                            "type": "uint256"
+                        },
+                        {
+                            "indexed": false,
+                            "internalType": "string",
+                            "name": "action",
+                            "type": "string"
+                        },
+                        {
+                            "indexed": false,
+                            "internalType": "uint256",
+                            "name": "timestamp",
+                            "type": "uint256"
+                        }
+                    ],
+                    "name": "UserTransactionRecorded",
+                    "type": "event"
+                },
+                {
+                    "inputs": [],
+                    "name": "getAllUsers",
+                    "outputs": [
+                        {
+                            "internalType": "address[]",
+                            "name": "",
+                            "type": "address[]"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        }
+                    ],
+                    "name": "getUser",
+                    "outputs": [
+                        {
+                            "internalType": "string",
+                            "name": "name",
+                            "type": "string"
+                        },
+                        {
+                            "internalType": "bool",
+                            "name": "exists",
+                            "type": "bool"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "createdAt",
+                            "type": "uint256"
+                        },
+                        {
+                            "internalType": "uint256",
+                            "name": "transactionCount",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        }
+                    ],
+                    "name": "getUserTransactionCount",
+                    "outputs": [
+                        {
+                            "internalType": "uint256",
+                            "name": "",
+                            "type": "uint256"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                },
+                {
+                    "inputs": [],
+                    "name": "owner",
+                    "outputs": [
+                        {
+                            "internalType": "address",
+                            "name": "",
+                            "type": "address"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                },
+                {
+                    "inputs": [
+                        {
+                            "internalType": "address",
+                            "name": "userAddress",
+                            "type": "address"
+                        }
+                    ],
+                    "name": "viewUserTransactions",
+                    "outputs": [
+                        {
+                            "components": [
+                                {
+                                    "internalType": "address",
+                                    "name": "from",
+                                    "type": "address"
+                                },
+                                {
+                                    "internalType": "address",
+                                    "name": "to",
+                                    "type": "address"
+                                },
+                                {
+                                    "internalType": "uint256",
+                                    "name": "amount",
+                                    "type": "uint256"
+                                },
+                                {
+                                    "internalType": "uint256",
+                                    "name": "timestamp",
+                                    "type": "uint256"
+                                },
+                                {
+                                    "internalType": "string",
+                                    "name": "action",
+                                    "type": "string"
+                                }
+                            ],
+                            "internalType": "struct UserTransactionManager.UserTransaction[]",
+                            "name": "",
+                            "type": "tuple[]"
+                        }
+                    ],
+                    "stateMutability": "view",
+                    "type": "function"
+                }
+            ];
+
+            function getContract() {
+                const contractAddress = document.getElementById("contractAddress").value.trim();
+                if (!contractAddress) {
+                    throw new Error("Please input contract address");
+                }
+                const web3 = new Web3(Web3.givenProvider);
+                return { web3, contract: new web3.eth.Contract(contractABI, contractAddress) };
+            }
+
+            document.getElementById("contractAddress").value = defaultContractAddress;
+
+            function setResult(message) {
+                document.getElementById("result").innerText = message;
+            }
+
+            async function addUser() {
+                try {
+                    const { web3, contract } = getContract();
+                    const accounts = await web3.eth.requestAccounts();
+                    const userAddress = document.getElementById("userAddress").value;
+                    const userName = document.getElementById("userName").value;
+                    await contract.methods.addUser(userAddress, userName).send({ from: accounts[0] });
+                    setResult("User added successfully");
+                } catch (err) {
+                    setResult(err.message);
+                }
+            }
+
+            async function storeUser() {
+                try {
+                    const { web3, contract } = getContract();
+                    const accounts = await web3.eth.requestAccounts();
+                    const userAddress = document.getElementById("userAddress").value;
+                    const userName = document.getElementById("userName").value;
+                    await contract.methods.storeUser(userAddress, userName).send({ from: accounts[0] });
+                    setResult("User stored/updated successfully");
+                } catch (err) {
+                    setResult(err.message);
+                }
+            }
+
+            async function deleteUser() {
+                try {
+                    const { web3, contract } = getContract();
+                    const accounts = await web3.eth.requestAccounts();
+                    const userAddress = document.getElementById("userAddress").value;
+                    await contract.methods.deleteUser(userAddress).send({ from: accounts[0] });
+                    setResult("User deleted successfully");
+                } catch (err) {
+                    setResult(err.message);
+                }
+            }
+
+            async function getUser() {
+                try {
+                    const { contract } = getContract();
+                    const userAddress = document.getElementById("userAddress").value;
+                    const result = await contract.methods.getUser(userAddress).call();
+                    setResult(
+                        "Name: " + result.name +
+                        " | Exists: " + result.exists +
+                        " | CreatedAt: " + result.createdAt +
+                        " | TxCount: " + result.transactionCount
+                    );
+                } catch (err) {
+                    setResult(err.message);
+                }
+            }
+
+            async function getAllUsers() {
+                try {
+                    const { contract } = getContract();
+                    const result = await contract.methods.getAllUsers().call();
+                    setResult("All users: " + JSON.stringify(result));
+                } catch (err) {
+                    setResult(err.message);
+                }
+            }
+
+            async function recordTransaction() {
+                try {
+                    const { web3, contract } = getContract();
+                    const accounts = await web3.eth.requestAccounts();
+                    const userAddress = document.getElementById("userAddress").value;
+                    const fromAddress = document.getElementById("fromAddress").value;
+                    const toAddress = document.getElementById("toAddress").value;
+                    const amount = document.getElementById("amount").value;
+                    const action = document.getElementById("action").value;
+                    await contract.methods.recordUserTransaction(userAddress, fromAddress, toAddress, amount, action).send({ from: accounts[0] });
+                    setResult("Transaction recorded successfully");
+                } catch (err) {
+                    setResult(err.message);
+                }
+            }
+
+            async function viewTransactions() {
+                try {
+                    const { contract } = getContract();
+                    const userAddress = document.getElementById("userAddress").value;
+                    const result = await contract.methods.viewUserTransactions(userAddress).call();
+                    setResult("Transactions: " + JSON.stringify(result));
+                } catch (err) {
+                    setResult(err.message);
+                }
+            }
+        </script>
+    </div>
+</body>
